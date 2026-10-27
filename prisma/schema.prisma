@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model User {
+  id            String            @id @default(uuid())
+  email         String            @unique
+  name          String
+  passwordHash  String?
+  emailVerified Boolean           @default(false)
+  googleId      String?           @unique
+  timezone      String            @default("UTC")
+  deletedAt     DateTime?
+  createdAt     DateTime          @default(now())
+  memberships   WorkspaceMember[]
+  assignments   TaskAssignee[]
+  comments      Comment[]
+  refreshTokens RefreshToken[]
+  notifications Notification[]
+  activityLogs  ActivityLog[]
+  authTokens    AuthToken[]
+
+  @@index([email])
+}
+
+enum AuthTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+model AuthToken {
+  id        String        @id @default(uuid())
+  userId    String
+  type      AuthTokenType
+  tokenHash String        @unique
+  expiresAt DateTime
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([tokenHash])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  familyId  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+model Workspace {
+  id           String            @id @default(uuid())
+  name         String
+  slug         String            @unique
+  createdAt    DateTime          @default(now())
+  members      WorkspaceMember[]
+  boards       Board[]
+  tags         Tag[]
+  invitations  Invitation[]
+  activityLogs ActivityLog[]
+}
+
+model WorkspaceMember {
+  workspaceId String
+  userId      String
+  role        Role
+  joinedAt    DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId])
+  @@index([userId])
+}
+
+model Invitation {
+  id          String    @id @default(uuid())
+  workspaceId String
+  email       String
+  role        Role
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, email])
+}
+
+model Board {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  columns     Column[]
+
+  @@index([workspaceId])
+}
+
+model Column {
+  id       String  @id @default(uuid())
+  boardId  String
+  name     String
+  position Decimal @db.Decimal(20, 10)
+  board    Board   @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks    Task[]
+
+  @@index([boardId, position])
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  columnId    String
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  dueDate     DateTime?
+  position    Decimal    @db.Decimal(20, 10)
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  version     Int        @default(1)
+  deletedAt   DateTime?
+  workspaceId String
+  column      Column     @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  subtasks    Subtask[]
+  comments    Comment[]
+  attachments Attachment[]
+  assignees   TaskAssignee[]
+  tags        TaskTag[]
+
+  @@index([columnId, position])
+  @@index([status, priority])
+  @@index([dueDate])
+  @@index([workspaceId, status, priority])
+  @@index([workspaceId, deletedAt])
+  @@index([createdAt, id])
+}
+
+model Subtask {
+  id     String  @id @default(uuid())
+  taskId String
+  title  String
+  done   Boolean @default(false)
+  task   Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model TaskAssignee {
+  taskId String
+  userId String
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+  @@index([userId])
+}
+
+model Tag {
+  id          String    @id @default(uuid())
+  workspaceId String
+  name        String
+  color       String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks       TaskTag[]
+
+  @@unique([workspaceId, name])
+}
+
+model TaskTag {
+  taskId String
+  tagId  String
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  taskId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+
+  @@index([taskId, createdAt])
+}
+
+model Attachment {
+  id         String   @id @default(uuid())
+  taskId     String
+  key        String
+  fileName   String
+  mimeType   String
+  sizeBytes  Int
+  uploadedBy String
+  createdAt  DateTime @default(now())
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model OutboxEvent {
+  id          BigInt    @id @default(autoincrement())
+  aggregate   String
+  aggregateId String
+  type        String
+  payload     Json
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([processedAt, id])
+}
+
+model IdempotencyKey {
+  key          String
+  userId       String
+  requestHash  String
+  responseCode Int?
+  responseBody Json?
+  createdAt    DateTime @default(now())
+
+  @@id([userId, key])
+  @@index([createdAt])
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  workspaceId String
+  actorId     String
+  entityType  String
+  entityId    String
+  action      String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor       User      @relation(fields: [actorId], references: [id])
+
+  @@index([workspaceId, createdAt])
+  @@index([entityType, entityId])
+}
