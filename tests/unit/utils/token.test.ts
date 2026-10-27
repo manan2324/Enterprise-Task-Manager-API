@@ -38,3 +38,4 @@ describe('token utility', () => {
     expect(() => verifyAccessToken('tampered.or.invalid.token')).toThrow(AppError);
   });
 });
+

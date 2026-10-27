@@ -33,3 +33,4 @@ describe('authenticate middleware', () => {
     expect(next).toHaveBeenCalled();
   });
 });
+

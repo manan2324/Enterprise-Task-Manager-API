@@ -31,3 +31,4 @@ describe('password utility', () => {
     expect(match).toBe(false);
   });
 });
+

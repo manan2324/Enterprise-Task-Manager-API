@@ -54,3 +54,4 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
     throw new AppError(401, 'INVALID_TOKEN', 'Access token verification failed');
   }
 }
+
