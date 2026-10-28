@@ -3,6 +3,7 @@ import { tasksController } from './tasks.controller.js';
 import { authenticate } from '../../middlewares/authenticate.js';
 import { requireRole } from '../../middlewares/require-role.js';
 import { validate } from '../../middlewares/validate.js';
+import { idempotency } from '../../middlewares/idempotency.js';
 import { asyncHandler } from '../../utils/async-handler.js';
 import {
   createTaskSchema,
@@ -29,6 +30,7 @@ columnTasksRouter.post(
   '/',
   authenticate,
   requireRole('MEMBER'),
+  idempotency,
   validate({ body: createTaskSchema }),
   asyncHandler(tasksController.createTask),
 );
@@ -119,6 +121,7 @@ tasksRouter.post(
   '/:id/comments',
   authenticate,
   requireRole('MEMBER'),
+  idempotency,
   validate({ body: createCommentSchema }),
   asyncHandler(tasksController.createComment),
 );

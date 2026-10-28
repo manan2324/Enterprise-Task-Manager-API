@@ -5,6 +5,7 @@ import { between } from '../../utils/position.js';
 import { decodeCursor } from '../../utils/pagination.js';
 import { storageService } from '../../services/storage.service.js';
 import { AppError } from '../../utils/app-error.js';
+import { tasksCreatedTotal } from '../../config/metrics.js';
 import type {
   CreateTaskInput,
   UpdateTaskInput,
@@ -91,6 +92,7 @@ export class TasksService {
         },
       });
 
+      tasksCreatedTotal.inc();
       return task;
     });
   }

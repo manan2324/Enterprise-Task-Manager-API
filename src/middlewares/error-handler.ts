@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { Prisma } from '../generated/prisma/client.js';
 import { AppError } from '../utils/app-error.js';
 import { logger } from '../config/logger.js';
+import { captureException } from '../config/sentry.js';
 
 interface ErrorResponse {
   error: {
@@ -38,6 +39,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   if (err instanceof AppError) {
     if (err.statusCode >= 500) {
       logger.error({ err, requestId }, 'Server error');
+      captureException(err, { requestId, code: err.code, statusCode: err.statusCode, path: req.path });
     }
 
     const response: ErrorResponse = {
@@ -82,6 +84,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
 
   // Unknown / unexpected errors → 500
   logger.error({ err, requestId }, 'Unhandled error');
+  captureException(err, { requestId, path: req.path, method: req.method });
 
   const response: ErrorResponse = {
     error: {

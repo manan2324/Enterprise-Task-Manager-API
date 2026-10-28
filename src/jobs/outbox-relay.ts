@@ -3,6 +3,7 @@ import { logger } from '../config/logger.js';
 import { cacheService } from '../services/cache.service.js';
 import { emitToBoard, emitToUser } from '../realtime/events.js';
 import { assignmentEmailQueue } from './queues.js';
+import { outboxEventsProcessedTotal } from '../config/metrics.js';
 
 interface OutboxRecord {
   id: bigint;
@@ -92,6 +93,7 @@ export async function processOutboxEvents(batchSize = 50): Promise<number> {
         where: { id: event.id },
         data: { processedAt: new Date() },
       });
+      outboxEventsProcessedTotal.inc();
     } catch (err) {
       logger.error({ err, eventId: Number(event.id) }, 'Failed to dispatch outbox event');
     }

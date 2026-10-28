@@ -5,6 +5,7 @@ import { workspaceTagsRouter } from '../tags/tags.routes.js';
 import { authenticate } from '../../middlewares/authenticate.js';
 import { requireRole } from '../../middlewares/require-role.js';
 import { validate } from '../../middlewares/validate.js';
+import { idempotency } from '../../middlewares/idempotency.js';
 import { asyncHandler } from '../../utils/async-handler.js';
 import {
   createWorkspaceSchema,
@@ -94,6 +95,7 @@ router.delete(
 invitationsRouter.post(
   '/accept',
   authenticate,
+  idempotency,
   validate({ body: acceptInvitationSchema }),
   asyncHandler(workspacesController.acceptInvite),
 );

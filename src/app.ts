@@ -3,10 +3,15 @@ import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { pinoHttp } from 'pino-http';
+import swaggerUi from 'swagger-ui-express';
 import { logger } from './config/logger.js';
 import { env } from './config/env.js';
 import { requestId } from './middlewares/request-id.js';
 import { errorHandler } from './middlewares/error-handler.js';
+import { metricsMiddleware } from './middlewares/metrics.js';
+import { loadShedding } from './middlewares/load-shedding.js';
+import { register } from './config/metrics.js';
+import { openApiDoc } from './docs/openapi.js';
 import { prisma } from './config/prisma.js';
 import { redis } from './config/redis.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
@@ -16,8 +21,23 @@ import { tasksRouter, attachmentsRouter } from './modules/tasks/tasks.routes.js'
 
 const app = express();
 
+// ── Observability & Load Shedding ──
+app.use(metricsMiddleware);
+app.use(loadShedding);
+
 // ── Security ──
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+      },
+    },
+  }),
+);
 app.use(
   cors({
     origin: env.APP_URL,
@@ -41,7 +61,15 @@ const httpLogger = pinoHttp({
     return 'info';
   },
   redact: {
-    paths: ['req.headers.authorization', 'req.headers.cookie'],
+    paths: [
+      'req.headers.authorization',
+      'req.headers.cookie',
+      '*.password',
+      '*.passwordHash',
+      '*.token',
+      '*.refreshToken',
+      '*.newPassword',
+    ],
     censor: '[REDACTED]',
   },
 });
@@ -51,6 +79,19 @@ app.use((req, res, next) => {
 
 // Trust proxy for accurate client IPs behind load balancer
 app.set('trust proxy', 1);
+
+// ── Documentation (OpenAPI / Swagger UI) ──
+app.get('/openapi.json', (_req, res) => {
+  res.status(200).json(openApiDoc);
+});
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiDoc));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openApiDoc));
+
+// ── Prometheus Metrics ──
+app.get('/metrics', async (_req, res) => {
+  res.setHeader('Content-Type', register.contentType);
+  res.send(await register.metrics());
+});
 
 // ── Health & Readiness ──
 app.get('/health', (_req, res) => {
@@ -132,7 +173,7 @@ app.use((_req, res) => {
   });
 });
 
-// ── Central error handler (must be last) ──
+// ── Central error handler ──
 app.use(errorHandler);
 
 export { app };

@@ -1,6 +1,7 @@
 import { Worker, type Job } from 'bullmq';
 import { workerRedis } from '../config/redis.js';
 import { logger } from '../config/logger.js';
+import { captureException } from '../config/sentry.js';
 import { emailService } from '../services/email.service.js';
 import { prisma } from '../config/prisma.js';
 import {
@@ -86,7 +87,7 @@ export async function dispatchDueReminders(): Promise<number> {
 }
 
 export function createAssignmentEmailWorker(): Worker<AssignmentEmailJobPayload> {
-  return new Worker<AssignmentEmailJobPayload>(
+  const worker = new Worker<AssignmentEmailJobPayload>(
     'assignment-email',
     async (job: Job<AssignmentEmailJobPayload>) => {
       const { userEmail, taskTitle, actorName, taskId } = job.data;
@@ -98,10 +99,17 @@ export function createAssignmentEmailWorker(): Worker<AssignmentEmailJobPayload>
       concurrency: 5,
     },
   );
+
+  worker.on('failed', (job, err) => {
+    logger.error({ jobId: job?.id, attemptsMade: job?.attemptsMade, err }, 'Worker assignment email job failed');
+    captureException(err, { jobId: job?.id, queue: 'assignment-email' });
+  });
+
+  return worker;
 }
 
 export function createDueRemindersWorker(): Worker<DueReminderJobPayload> {
-  return new Worker<DueReminderJobPayload>(
+  const worker = new Worker<DueReminderJobPayload>(
     'due-reminders',
     async (job: Job<DueReminderJobPayload>) => {
       const { userEmail, tasks } = job.data;
@@ -113,6 +121,13 @@ export function createDueRemindersWorker(): Worker<DueReminderJobPayload> {
       concurrency: 5,
     },
   );
+
+  worker.on('failed', (job, err) => {
+    logger.error({ jobId: job?.id, attemptsMade: job?.attemptsMade, err }, 'Worker due reminders job failed');
+    captureException(err, { jobId: job?.id, queue: 'due-reminders' });
+  });
+
+  return worker;
 }
 
 export interface WorkerRunner {
