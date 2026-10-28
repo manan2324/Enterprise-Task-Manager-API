@@ -296,8 +296,16 @@ export class TasksRepository {
       cursor?: { createdAt: Date; id: string } | null;
     },
   ) {
-    const where: Prisma.TaskWhereInput = {
-      column: { boardId },
+    const columns = await prisma.column.findMany({
+      where: { boardId },
+      select: { id: true },
+    });
+
+    if (columns.length === 0) {
+      return { data: [], hasNext: false, nextCursor: null };
+    }
+
+    const baseWhere: Prisma.TaskWhereInput = {
       deletedAt: null,
       ...(filters.status && { status: filters.status }),
       ...(filters.priority && { priority: filters.priority }),
@@ -323,20 +331,47 @@ export class TasksRepository {
       }),
     };
 
-    const items = await prisma.task.findMany({
-      where,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: filters.limit + 1,
-      include: {
-        column: { select: { id: true, name: true } },
-        assignees: {
-          include: {
-            user: { select: { id: true, name: true, email: true } },
-          },
+    const taskInclude = {
+      column: { select: { id: true, name: true } },
+      assignees: {
+        include: {
+          user: { select: { id: true, name: true, email: true } },
         },
-        tags: { include: { tag: true } },
       },
-    });
+      tags: { include: { tag: true } },
+    } as const;
+
+    let items;
+    const firstCol = columns[0];
+    if (columns.length === 1 && firstCol) {
+      items = await prisma.task.findMany({
+        where: { ...baseWhere, columnId: firstCol.id },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: filters.limit + 1,
+        include: taskInclude,
+      });
+    } else {
+      // Parallel index scan per column to avoid PostgreSQL multi-column IN heapsort on 1M+ rows
+      const perColumnResults = await Promise.all(
+        columns.map((col) =>
+          prisma.task.findMany({
+            where: { ...baseWhere, columnId: col.id },
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            take: filters.limit + 1,
+            include: taskInclude,
+          }),
+        ),
+      );
+
+      items = perColumnResults
+        .flat()
+        .sort((a, b) => {
+          const timeDiff = b.createdAt.getTime() - a.createdAt.getTime();
+          if (timeDiff !== 0) return timeDiff;
+          return b.id.localeCompare(a.id);
+        })
+        .slice(0, filters.limit + 1);
+    }
 
     const hasNext = items.length > filters.limit;
     const data = hasNext ? items.slice(0, -1) : items;

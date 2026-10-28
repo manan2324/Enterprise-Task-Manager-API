@@ -18,9 +18,19 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/config/env.ts'],
+    files: ['src/config/env.ts', 'tests/load/benchmark-runner.ts'],
     rules: {
-      'no-console': 'off', // Logger isn't available yet during env validation
+      'no-console': 'off', // Logger isn't available yet during env validation; CLI benchmark runner
+    },
+  },
+  {
+    files: ['tests/load/k6-*.js'],
+    languageOptions: {
+      globals: {
+        __ENV: 'readonly',
+        __VU: 'readonly',
+        __ITER: 'readonly',
+      },
     },
   },
   {

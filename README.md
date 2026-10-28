@@ -8,11 +8,31 @@
 
 A production-grade, modular monolith Trello/Asana-style task management backend API built in **TypeScript** and **Node.js 22**, tested with **real PostgreSQL & Redis**, documented with **OpenAPI/Swagger derived from Zod schemas**, and engineered for high-concurrency enterprise workloads (1M+ users).
 
-**Interactive Swagger UI:** [http://localhost:3000/docs](http://localhost:3000/docs) · **OpenAPI Spec:** [http://localhost:3000/openapi.json](http://localhost:3000/openapi.json) · **Prometheus Metrics:** [http://localhost:3000/metrics](http://localhost:3000/metrics)
+**Live API:** `https://taskmanager-api.onrender.com` · **API Docs:** `https://taskmanager-api.onrender.com/docs` · **OpenAPI Spec:** `https://taskmanager-api.onrender.com/openapi.json` · **Prometheus Metrics:** `https://taskmanager-api.onrender.com/metrics`
+
+*(Local endpoints: [http://localhost:3000/docs](http://localhost:3000/docs) · [http://localhost:3000/openapi.json](http://localhost:3000/openapi.json) · [http://localhost:3000/metrics](http://localhost:3000/metrics))*
 
 ---
 
-## Architecture Overview
+## Features
+
+- **Authentication (§5.1):** Argon2id hashing, email verification, login rate limiting (5 attempts/15m), short-lived access tokens (15m), rotating refresh tokens with reuse detection (family invalidation), password reset.
+- **Workspaces & RBAC (§5.2):** Strict multi-tenant workspace isolation. 4-tier Role Matrix (`OWNER`, `ADMIN`, `MEMBER`, `VIEWER`), tokenized invitations, cross-tenant IDOR protection (404 on unpermitted resources).
+- **Boards & Columns (§5.2):** Dynamic kanban boards, starter columns, fractional column reordering, Redis cache-aside with automatic invalidation on mutations.
+- **Tasks & Subtasks (§5.3):** Task lifecycle (`TODO`, `IN_PROGRESS`, `IN_REVIEW`, `DONE`), priorities (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), due dates, assignees, workspace tags, hierarchical subtasks, task comments.
+- **Fractional Ordering (§5.3):** Midpoint fractional positioning (`between(prev, next)` using `Decimal(20, 10)`). Reordering only touches 1 row without updating neighboring positions.
+- **Optimistic Concurrency (§13.2):** Atomic version checks (`version` integer / `If-Match` header) preventing lost updates in concurrent multi-user environments.
+- **Transactional Outbox (§14.2):** Change mutations, activity logs, and `OutboxEvent` rows committed atomically. Relay dispatches with PostgreSQL `FOR UPDATE SKIP LOCKED` for zero lost events.
+- **Search & Keyset Pagination (§6.1):** Text search (`q`), status, priority, assignee, and due date bounds with composite cursor pagination (`createdAt:id` / `dueDate:id`).
+- **Attachments (§6.2):** Pre-signed S3/Cloudflare R2 direct uploads & downloads. File name sanitization, MIME whitelist, and 10MB limit enforcement.
+- **Realtime Updates (§6.3):** Socket.io with `@socket.io/redis-adapter` for horizontal scaling. Personal user rooms (`user:{id}`) and board rooms (`board:{id}`).
+- **Background Workers (§6.6):** BullMQ queues on dedicated Redis connection: assignment notification emails with backoff retry, and timezone-aware daily due reminders digest.
+- **Idempotency Keys (§14.1):** Request deduplication for non-idempotent operations via `Idempotency-Key` header with SHA-256 payload verification.
+- **Load Shedding & Metrics (§14.3, §17):** Node event-loop monitoring (`monitorEventLoopDelay`) returning 503 + `Retry-After: 5` under saturation. Full Prometheus RED metrics exposed at `/metrics`.
+
+---
+
+## Architecture
 
 ```mermaid
 flowchart TD
@@ -47,29 +67,16 @@ flowchart TD
     end
 ```
 
----
-
-## Core Features
-
-| Module | Features |
-|---|---|
-| **Authentication (§5.1)** | Argon2id hashing, email verification, login rate limiting (5 attempts/15m), short-lived access tokens (15m), rotating refresh tokens with reuse detection (family invalidation), password reset. |
-| **Workspaces & RBAC (§5.2)** | Multi-tenancy with strict workspace isolation. 4-tier Role Matrix (`OWNER`, `ADMIN`, `MEMBER`, `VIEWER`), tokenized invitations, cross-tenant IDOR protection (404 on unpermitted resources). |
-| **Boards & Columns (§5.2)** | Dynamic kanban boards, starter columns, fractional column reordering, Redis cache-aside with automatic invalidation on mutations. |
-| **Tasks & Subtasks (§5.3)** | Task lifecycle (`TODO`, `IN_PROGRESS`, `IN_REVIEW`, `DONE`), priorities (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), due dates, assignees, workspace tags, hierarchical subtasks, task comments. |
-| **Fractional Ordering (§5.3)** | Midpoint fractional positioning (`between(prev, next)` using `Decimal(20, 10)`). Reordering only touches 1 row without updating neighboring positions. |
-| **Optimistic Concurrency (§13.2)** | Atomic version checks (`version` integer / `If-Match` header) preventing lost updates in concurrent multi-user environments. |
-| **Transactional Outbox (§14.2)** | Change mutations, activity logs, and `OutboxEvent` rows committed atomically. Relay dispatches with PostgreSQL `FOR UPDATE SKIP LOCKED` for zero lost events. |
-| **Search & Keyset Pagination (§6.1)** | Text search (`q`), status, priority, assignee, and due date bounds with composite cursor pagination (`createdAt:id` / `dueDate:id`). |
-| **Attachments (§6.2)** | Pre-signed S3/Cloudflare R2 direct uploads & downloads. File name sanitization, MIME whitelist, and 10MB limit enforcement. |
-| **Realtime Updates (§6.3)** | Socket.io with `@socket.io/redis-adapter` for horizontal scaling. Personal user rooms (`user:{id}`) and board rooms (`board:{id}`). |
-| **Background Workers (§6.6)** | BullMQ queues on dedicated Redis connection: assignment notification emails with backoff retry, and timezone-aware daily due reminders digest. |
-| **Idempotency Keys (§14.1)** | Request deduplication for non-idempotent operations via `Idempotency-Key` header with SHA-256 payload verification. |
-| **Load Shedding & Metrics (§14.3, §17)** | Node event-loop monitoring (`monitorEventLoopDelay`) returning 503 + `Retry-After: 5` under saturation. Full Prometheus RED metrics exposed at `/metrics`. |
+### Module Boundaries & Request Flow
+1. **Edge Validation:** Incoming requests pass through security headers (`helmet`), strict CORS, body size limit (`1mb`), request ID generation (`requestId`), load shedding, and Zod validation middleware.
+2. **Controller & Service Layer:** Thin controllers invoke fat services that execute domain rules and coordinate database transactions.
+3. **Database & Outbox Invariants:** Domain changes, activity log entries, and `OutboxEvent` records are written atomically in a single Prisma transaction.
+4. **Relay & Workers:** The outbox relay reads pending events using `FOR UPDATE SKIP LOCKED` and fans out notifications to Socket.io, BullMQ job queues, and the Redis cache without blocking user requests.
+5. **Storage:** Large file transfers bypass the API server entirely via short-lived pre-signed S3/R2 upload and download URLs.
 
 ---
 
-## Database Architecture & Entity Relationships
+## Database
 
 ```mermaid
 erDiagram
@@ -100,72 +107,64 @@ erDiagram
 ```
 
 ### Why PostgreSQL?
-1. **ACID Transactions:** Invariants such as task creation + activity log + outbox event commit in a single database transaction.
-2. **Row Locking Primitive:** `FOR UPDATE SKIP LOCKED` enables concurrent, conflict-free outbox relay worker processes.
-3. **Decimal Precision:** Arbitrary-precision `DECIMAL(20, 10)` supports infinite fractional ordering without column reindexing overhead.
-4. **Partial & Composite Indexes:** Optimized indexes for tenant lookups (`workspaceId, status, priority`), active records (`workspaceId, deletedAt WHERE deletedAt IS NULL`), and keyset pagination (`createdAt, id`).
+- **ACID Transactions:** Invariants such as task creation + activity log + outbox event commit in a single database transaction.
+- **Row Locking Primitives:** `FOR UPDATE SKIP LOCKED` enables concurrent, conflict-free outbox relay worker processes across multiple container replicas.
+- **Decimal Precision:** Arbitrary-precision `DECIMAL(20, 10)` supports infinite fractional ordering without column reindexing overhead.
+- **Partial & Composite Indexes:** Optimized indexes for tenant lookups (`workspaceId, status, priority`), active records (`workspaceId, deletedAt WHERE deletedAt IS NULL`), and keyset pagination (`createdAt, id`).
+
+### Notable Indexes
+- `Task(columnId, position)`: Fast ordering scans within a column.
+- `Task(workspaceId, status, priority)`: Filtered workspace task queries.
+- `Task(workspaceId, deletedAt)`: Soft deletion partial query filter.
+- `Task(createdAt, id)` & `Task(dueDate)`: Fast cursor pagination without full table scans.
+- `OutboxEvent(processedAt, id)`: Outbox relay worker queue polling.
+- `IdempotencyKey(userId, key)`: Fast composite lookups for request deduplication.
 
 ---
 
 ## Local Setup
 
-### Prerequisites
-- Node.js ≥ 22.0.0
-- Docker & Docker Compose
-- npm ≥ 10.0.0
-
-### Step-by-Step Instructions
-
-1. **Clone the repository:**
+1. **Clone repository and configure environment:**
    ```bash
-   git clone <repo-url>
-   cd "Enterprise Task Manager API"
-   ```
-
-2. **Configure environment:**
-   ```bash
+   git clone <repo-url> && cd "Enterprise Task Manager API"
    cp .env.example .env
    ```
 
-3. **Start infrastructure (Postgres, Redis, MailHog):**
+2. **Start Docker infrastructure:**
    ```bash
    docker compose up -d
    ```
+   *Spins up PostgreSQL 16 (port 5433), Redis 7 (port 6379), and MailHog SMTP/Web UI (ports 1025/8025).*
 
-4. **Install dependencies & generate Prisma client:**
+3. **Install dependencies and migrate database:**
    ```bash
    npm ci
    npx prisma generate
-   ```
-
-5. **Run database migrations:**
-   ```bash
    npx prisma migrate deploy
    ```
 
-6. **Seed demo data (Optional):**
+4. **Seed demo data (Optional):**
    ```bash
    npm run prisma:seed
    ```
-   *Seeds 4 demo users (`owner@example.com`, `admin@example.com`, `member@example.com`, `viewer@example.com`), password: `Password123!`, a demo workspace, boards, columns, and tasks.*
+   *Seeds 4 demo users (`owner@example.com`, `admin@example.com`, `member@example.com`, `viewer@example.com` / password: `Password123!`), a sample workspace, kanban boards, columns, and tasks.*
 
-7. **Start development server:**
+5. **Start development API server:**
    ```bash
    npm run dev
    ```
+   *Open [http://localhost:3000/docs](http://localhost:3000/docs) (MailHog UI: [http://localhost:8025](http://localhost:8025)).*
 
-8. **Access endpoints:**
-   - **Interactive Swagger UI:** [http://localhost:3000/docs](http://localhost:3000/docs)
-   - **OpenAPI JSON Spec:** [http://localhost:3000/openapi.json](http://localhost:3000/openapi.json)
-   - **Prometheus Metrics:** [http://localhost:3000/metrics](http://localhost:3000/metrics)
-   - **Health & Readiness:** [http://localhost:3000/health](http://localhost:3000/health) & [http://localhost:3000/ready](http://localhost:3000/ready)
-   - **MailHog Web UI:** [http://localhost:8025](http://localhost:8025)
+6. **Start background worker process (in a separate terminal):**
+   ```bash
+   npm run worker:dev
+   ```
 
 ---
 
 ## Running Tests
 
-All integration tests execute against real PostgreSQL and Redis instances.
+All unit and integration tests execute against real PostgreSQL and Redis instances.
 
 ```bash
 # Run all unit and integration tests (164 tests across 25 suites)
@@ -178,7 +177,7 @@ npm run test:cov
 npm run typecheck
 npm run lint
 
-# Production compilation
+# Production build compilation
 npm run build
 ```
 
@@ -186,68 +185,99 @@ npm run build
 
 ## Environment Variables
 
-| Variable | Type | Required | Description | Default / Example |
-|---|---|:---:|---|---|
-| `NODE_ENV` | String | Yes | Application environment | `development` / `production` |
-| `PORT` | Number | Yes | HTTP server port | `3000` |
-| `DATABASE_URL` | URL | Yes | PostgreSQL connection string | `postgresql://app:app@localhost:5433/taskmanager` |
-| `REDIS_URL` | URL | Yes | Redis connection string | `redis://localhost:6379` |
-| `JWT_ACCESS_SECRET` | String | Yes | HMAC-SHA256 secret (min 32 chars) | `your-secure-access-secret-32-chars!` |
-| `JWT_REFRESH_SECRET` | String | Yes | HMAC-SHA256 secret (min 32 chars) | `your-secure-refresh-secret-32-chars!` |
-| `ACCESS_TOKEN_TTL` | String | No | Access token expiration | `15m` |
-| `REFRESH_TOKEN_TTL_DAYS` | Number | No | Refresh token TTL | `30` |
-| `APP_URL` | URL | Yes | Public application URL (CORS origin) | `http://localhost:3000` |
-| `SMTP_HOST` | String | Yes | SMTP server hostname | `localhost` |
-| `SMTP_PORT` | Number | Yes | SMTP port | `1025` (MailHog) / `587` |
-| `SMTP_USER` | String | No | SMTP authentication username | — |
-| `SMTP_PASS` | String | No | SMTP authentication password | — |
-| `S3_BUCKET` | String | Yes | S3 / Cloudflare R2 bucket name | `task-manager-attachments` |
-| `S3_REGION` | String | No | S3 region | `auto` |
-| `S3_ENDPOINT` | URL | No | Custom S3 endpoint (for R2 / MinIO) | `https://<account>.r2.cloudflarestorage.com` |
-| `S3_ACCESS_KEY_ID` | String | Yes | S3 access key ID | `s3-access-key` |
-| `S3_SECRET_ACCESS_KEY` | String | Yes | S3 secret access key | `s3-secret-key` |
-| `SENTRY_DSN` | URL | No | Sentry DSN for error telemetry | — |
+| Variable | Required | Description | Example / Default |
+|---|:---:|---|---|
+| `NODE_ENV` | Yes | Application environment mode | `development` / `production` / `test` |
+| `PORT` | Yes | HTTP server listen port | `3000` |
+| `DATABASE_URL` | Yes | PostgreSQL connection string | `postgresql://app:app@localhost:5433/taskmanager` |
+| `REDIS_URL` | Yes | Redis connection string | `redis://localhost:6379` |
+| `JWT_ACCESS_SECRET` | Yes | HMAC-SHA256 secret for access tokens (min 32 chars) | `your-secure-access-secret-32-chars!` |
+| `JWT_REFRESH_SECRET` | Yes | HMAC-SHA256 secret for refresh tokens (min 32 chars) | `your-secure-refresh-secret-32-chars!` |
+| `ACCESS_TOKEN_TTL` | No | Lifespan of JWT access token | `15m` |
+| `REFRESH_TOKEN_TTL_DAYS` | No | Lifespan of rotating refresh token | `30` |
+| `APP_URL` | Yes | Client web origin for CORS allowlist | `http://localhost:3000` |
+| `SMTP_HOST` | Yes | Outbound mail server hostname | `localhost` / `smtp.resend.com` |
+| `SMTP_PORT` | Yes | Outbound mail server port | `1025` (MailHog) / `587` |
+| `SMTP_USER` | No | SMTP authentication username | — |
+| `SMTP_PASS` | No | SMTP authentication password | — |
+| `S3_BUCKET` | Yes | S3 or Cloudflare R2 bucket name | `task-manager-attachments` |
+| `S3_REGION` | No | AWS/R2 bucket region | `auto` / `us-east-1` |
+| `S3_ENDPOINT` | No | Custom S3 endpoint (for R2, MinIO, LocalStack) | `https://<account>.r2.cloudflarestorage.com` |
+| `S3_ACCESS_KEY_ID` | Yes | S3 API Access Key ID | `s3-access-key` |
+| `S3_SECRET_ACCESS_KEY` | Yes | S3 API Secret Access Key | `s3-secret-key` |
+| `SENTRY_DSN` | No | Sentry DSN for exception telemetry | `https://key@o12345.ingest.sentry.io/67890` |
 
 ---
 
-## Design Decisions & Scalability Trade-offs
+## Design Decisions & Trade-offs
 
 1. **Modular Monolith vs Microservices (§1):**
    - Built with strict domain module boundaries (`auth`, `workspaces`, `boards`, `tasks`, `activity`).
-   - Modules communicate via public interfaces and shared transactions; no distributed 2-phase commits required. Background workers and outbox relay can be scaled independently into separate processes.
+   - Modules communicate via public interfaces and shared transactions; no distributed 2-phase commits or network hops between services. Background workers and outbox relay can be scaled independently into separate processes.
 
-2. **Fractional Ordering vs Integer Position Updates (§5.3):**
-   - Reordering an item computes the midpoint between adjacent positions (`(prev + next) / 2`).
-   - **Advantage:** Reordering updates exactly **1 row** with $O(1)$ complexity, avoiding cascading row updates across thousands of items in large columns.
+2. **Fractional Ordering vs Integer Positions (§5.3):**
+   - Moving an item calculates the midpoint between adjacent positions (`(prev + next) / 2`).
+   - **Trade-off:** Reordering updates exactly **1 row** ($O(1)$ complexity), avoiding cascading row updates across thousands of items in large columns. Periodic column normalization eliminates precision edge cases.
 
-3. **Keyset (Cursor) Pagination vs Offset Pagination (§6.1):**
+3. **Cursor vs Offset Pagination (§6.1):**
    - Offset pagination (`OFFSET 50000 LIMIT 20`) causes severe table scan performance degradation ($O(N)$).
-   - Keyset cursor pagination uses composite indexes `(createdAt, id)` or `(dueDate, id)`, executing in $O(1)$ constant time regardless of page depth.
+   - Keyset cursor pagination uses composite indexes `(createdAt, id)` or `(dueDate, id)`, executing in $O(1)$ constant time regardless of page depth and preventing duplicate/skipped rows during concurrent insertions.
 
-4. **Transactional Outbox vs Immediate Emit (§14.2):**
-   - Direct emit after DB update loses events if the application crashes before the event is sent to Redis or the email server.
+4. **Short-Lived Access + Rotating Refresh Tokens (§5.1):**
+   - 15-minute stateless JWT access tokens minimize token revocation delay.
+   - Long-lived refresh tokens rotate on every exchange and are grouped into token families. If an already-rotated token is reused, the entire family is immediately revoked, defeating token theft.
+
+5. **Cache-Aside with TTL + Explicit Invalidation (§6.4):**
+   - Full board reads are cached in Redis (`board:{id}`) with a 5-minute TTL.
+   - Any mutation affecting board columns or tasks immediately evicts the cached key, ensuring strict read-after-write consistency.
+
+6. **Emit-After-Commit vs Transactional Outbox (§14.2):**
+   - Direct emit after DB update loses events if the application crashes before the event reaches Redis or the mail server.
    - Outbox rows are written in the same DB transaction as the domain change. The relay polls via `FOR UPDATE SKIP LOCKED`, guaranteeing at-least-once delivery.
-
-5. **Dedicated Redis Connections (§14.4):**
-   - Separate Redis client instances are maintained:
-     - `cacheRedis`: Board caching and fast TTL queries (`allkeys-lru`).
-     - `queueRedis` & `workerRedis`: BullMQ job queues configured with `maxRetriesPerRequest: null` and `noeviction` policy so background jobs are never dropped.
-
-6. **Database Connection Limits & Safety Timeouts (§13.3):**
-   - Connection pool size limited to 10 per replica.
-   - Session-level safety timeouts enforced on every connection:
-     `SET statement_timeout = 5000; SET lock_timeout = 2000; SET idle_in_transaction_session_timeout = 10000;`
-     preventing runaway queries from starving the pool.
 
 ---
 
-## Security & OWASP Top 10 Mitigations
+## Security
 
 - **Broken Access Control (IDOR):** Every tenant resource check resolves through workspace membership. Attempting to access resources in another workspace returns `404 Not Found` (preventing ID enumeration).
-- **Injection:** All queries are parameterised through Prisma ORM and sanitized PostgreSQL client queries.
+- **Injection Protection:** All queries are parameterised through Prisma ORM and sanitized PostgreSQL client queries.
 - **Identification & Auth Failures:** Passwords hashed with Argon2id; refresh tokens rotate on each exchange with automatic revocation of entire token family if reuse is detected. Rate-limiting protects auth endpoints from brute force.
 - **Security Misconfiguration:** Strict Content Security Policy (CSP) with `helmet`, CORS allow-list restricted to `APP_URL`, body size limit capped at `1mb`, secrets redacted from logs.
 - **Vulnerable Dependencies:** Automated `npm audit` and dependabot scanning in CI pipeline.
+
+---
+
+## Deployment
+
+### Hosting Strategy
+1. **Compute:** Render / Railway / Fly.io running two services from the same Docker image:
+   - Web API Service: `node dist/server.js` (Healthcheck probe: `/health`)
+   - Background Worker Service: `node dist/worker.js`
+2. **Database:** Neon or Supabase managed PostgreSQL (with PgBouncer connection pooling).
+3. **Redis:** Upstash Redis or host Redis add-on (separate connections for cache and BullMQ queues).
+4. **Storage:** Cloudflare R2 or AWS S3 with CORS rules allowing the frontend origin.
+
+### CI/CD Flow
+The GitHub Actions pipeline (`.github/workflows/ci.yml`) runs on every pull request and push to `main`:
+1. **Linting:** ESLint with zero warnings allowed.
+2. **Typecheck:** `tsc --noEmit` verifying full TypeScript safety.
+3. **Database Migration:** Deploys pending migrations against CI PostgreSQL service container.
+4. **Coverage Testing:** Runs test suite enforcing ≥70% coverage.
+5. **Build:** Compiles TypeScript to `dist/`.
+6. **Deploy:** Triggers host deploy webhook (`RENDER_DEPLOY_HOOK` or `RAILWAY_DEPLOY_TOKEN`).
+
+### How to Roll Back
+1. **Application Rollback:** Revert commit on `main` or trigger instant deployment of previous container digest in host dashboard.
+2. **Database Rollback:** Migrations adhere to the expand-migrate-contract zero-downtime pattern. Forward-compatible migrations can be rolled back via `npx prisma migrate resolve`.
+
+---
+
+## Roadmap
+
+- [ ] Google OAuth2 Single Sign-On (SSO)
+- [ ] Dedicated full-text search engine (Meilisearch / OpenSearch fed by outbox relay)
+- [ ] Workspace audit log export (CSV / JSON streaming)
+- [ ] Outbound webhooks for third-party integrations (Slack, Discord, Zapier)
 
 ---
 

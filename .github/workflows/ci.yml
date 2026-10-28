@@ -57,3 +57,27 @@ jobs:
       - run: npx prisma migrate deploy
       - run: npm run test:cov
       - run: npm run build
+
+  deploy:
+    name: Deploy to Production
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trigger deploy via host webhook
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          RAILWAY_DEPLOY_TOKEN: ${{ secrets.RAILWAY_DEPLOY_TOKEN }}
+        run: |
+          if [ -n "$RENDER_DEPLOY_HOOK" ]; then
+            echo "Triggering Render deployment webhook..."
+            curl -f -X POST "$RENDER_DEPLOY_HOOK"
+            echo "Render deployment triggered successfully."
+          elif [ -n "$RAILWAY_DEPLOY_TOKEN" ]; then
+            echo "Deploying to Railway..."
+            npx @railway/cli up --detach
+          else
+            echo "⚠️ No deployment webhook or token configured in GitHub Secrets (RENDER_DEPLOY_HOOK / RAILWAY_DEPLOY_TOKEN)."
+            echo "Skipping automated cloud deploy step."
+          fi

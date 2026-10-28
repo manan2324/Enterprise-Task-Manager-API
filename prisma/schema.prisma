@@ -137,6 +137,7 @@ model Column {
   tasks    Task[]
 
   @@index([boardId, position])
+  @@index([boardId])
 }
 
 model Task {
@@ -162,6 +163,7 @@ model Task {
   tags        TaskTag[]
 
   @@index([columnId, position])
+  @@index([columnId, status, priority, createdAt, id])
   @@index([status, priority])
   @@index([dueDate])
   @@index([workspaceId, status, priority])
@@ -272,7 +274,7 @@ model IdempotencyKey {
 }
 
 model ActivityLog {
-  id          String   @id @default(uuid())
+  id          String   @default(uuid())
   workspaceId String
   actorId     String
   entityType  String
@@ -283,6 +285,7 @@ model ActivityLog {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   actor       User      @relation(fields: [actorId], references: [id])
 
+  @@id([id, createdAt])
   @@index([workspaceId, createdAt])
   @@index([entityType, entityId])
 }
