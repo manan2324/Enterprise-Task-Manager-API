@@ -42,6 +42,19 @@ class EmailService {
       html: `<p>You requested a password reset.</p><p>Reset your password by clicking <a href="${url}">here</a>.</p>`,
     });
   }
+
+  async sendInvitationEmail(to: string, workspaceName: string, token: string): Promise<void> {
+    const url = `${env.APP_URL}/invitations/accept?token=${token}`;
+    logger.info({ to, workspaceName, url }, 'Sending workspace invitation email');
+
+    await this.transporter.sendMail({
+      from: '"Enterprise Task Manager" <invites@taskmanager.local>',
+      to,
+      subject: `You've been invited to join ${workspaceName}`,
+      text: `You were invited to join ${workspaceName} on Enterprise Task Manager. Accept invitation: ${url}`,
+      html: `<p>You were invited to join <strong>${workspaceName}</strong>.</p><p>Accept invitation by clicking <a href="${url}">here</a>.</p>`,
+    });
+  }
 }
 
 export const emailService = new EmailService();

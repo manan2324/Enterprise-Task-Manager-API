@@ -1,3 +1,5 @@
+import type { Role } from '../generated/prisma/client.js';
+
 /**
  * Augment Express types with custom properties we attach via middleware.
  */
@@ -11,6 +13,15 @@ declare global {
         id: string;
         email: string;
       };
+      /** Workspace membership resolved by requireRole middleware */
+      membership?: {
+        workspaceId: string;
+        userId: string;
+        role: Role;
+        joinedAt: Date;
+      };
+      /** Resolved workspace ID for current request context */
+      workspaceId?: string;
     }
   }
 }

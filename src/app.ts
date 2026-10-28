@@ -10,6 +10,8 @@ import { errorHandler } from './middlewares/error-handler.js';
 import { prisma } from './config/prisma.js';
 import { redis } from './config/redis.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
+import { workspaceRoutes, invitationsRouter } from './modules/workspaces/workspaces.routes.js';
+import { boardsRouter, columnsRouter } from './modules/boards/boards.routes.js';
 
 const app = express();
 
@@ -90,8 +92,26 @@ app.get('/ready', async (_req, res) => {
 });
 
 // ── Module routes ──
+
+//auth
 app.use('/auth', authRoutes);
 app.use('/api/v1/auth', authRoutes);
+
+//workspace
+app.use('/workspaces', workspaceRoutes);
+app.use('/api/v1/workspaces', workspaceRoutes);
+
+//invitations
+app.use('/invitations', invitationsRouter);
+app.use('/api/v1/invitations', invitationsRouter);
+
+//boards
+app.use('/boards', boardsRouter);
+app.use('/api/v1/boards', boardsRouter);
+
+//columns
+app.use('/columns', columnsRouter);
+app.use('/api/v1/columns', columnsRouter);
 
 // ── 404 handler ──
 app.use((_req, res) => {
