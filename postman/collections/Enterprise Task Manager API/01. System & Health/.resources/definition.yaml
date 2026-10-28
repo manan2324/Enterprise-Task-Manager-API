@@ -1,0 +1,3 @@
+$kind: collection
+description: Liveness, readiness probes, Prometheus RED metrics, and OpenAPI specification.
+order: 1000

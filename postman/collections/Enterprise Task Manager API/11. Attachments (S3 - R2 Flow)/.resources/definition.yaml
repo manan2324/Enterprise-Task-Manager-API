@@ -1,0 +1,4 @@
+$kind: collection
+name: 11. Attachments (S3 / R2 Flow)
+description: Direct-to-storage upload pattern using pre-signed PUT and GET URLs. Server never buffers large binary files in memory.
+order: 11000

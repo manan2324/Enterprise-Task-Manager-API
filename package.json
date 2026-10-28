@@ -23,7 +23,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:seed:scale": "tsx prisma/seed-scale.ts",
-    "benchmark": "tsx tests/load/benchmark-runner.ts"
+    "benchmark": "tsx tests/load/benchmark-runner.ts",
+    "postman:generate": "tsx scripts/generate-postman.ts",
+    "test:newman": "newman run postman/enterprise-task-manager.postman_collection.json -e postman/enterprise-task-manager.postman_environment.json"
   },
   "lint-staged": {
     "*.{ts,json,md}": [

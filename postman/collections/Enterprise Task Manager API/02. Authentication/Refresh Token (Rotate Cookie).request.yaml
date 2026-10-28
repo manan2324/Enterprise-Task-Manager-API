@@ -1,0 +1,16 @@
+$kind: http-request
+description: Rotates refresh token family. If an already-rotated token is reused, revokes the entire family.
+url: "{{baseUrl}}/auth/refresh"
+method: POST
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.accessToken) {
+          pm.environment.set("accessToken", json.data.accessToken);
+      }
+    language: text/javascript
+order: 4000

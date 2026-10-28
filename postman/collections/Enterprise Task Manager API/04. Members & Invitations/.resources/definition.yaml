@@ -1,0 +1,3 @@
+$kind: collection
+description: Team collaboration, invitation lifecycle with SHA-256 tokens, and RBAC role assignments.
+order: 4000

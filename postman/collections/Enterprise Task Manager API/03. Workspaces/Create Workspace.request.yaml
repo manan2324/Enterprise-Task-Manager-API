@@ -1,0 +1,27 @@
+$kind: http-request
+description: Creates a workspace and atomically assigns the creator as OWNER.
+url: "{{baseUrl}}/workspaces"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Acme Global Operations",
+      "slug": "acme-ops-{{$timestamp}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.id) {
+          pm.environment.set("workspaceId", json.data.id);
+          pm.environment.set("workspaceSlug", json.data.slug);
+          console.log("Active Workspace ID set to:", json.data.id);
+      }
+    language: text/javascript
+order: 1000

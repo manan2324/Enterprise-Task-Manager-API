@@ -1,0 +1,20 @@
+$kind: http-request
+description: Accepts invitation token and adds caller to workspace with specified role.
+url: "{{baseUrl}}/invitations/accept"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "token": "{{invitationToken}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+    language: text/javascript
+order: 3000

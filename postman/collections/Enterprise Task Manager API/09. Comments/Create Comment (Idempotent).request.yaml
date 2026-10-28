@@ -1,0 +1,25 @@
+$kind: http-request
+description: Posts comment on task and records activity entry.
+url: "{{baseUrl}}/tasks/{{taskId}}/comments"
+method: POST
+headers:
+  Content-Type: application/json
+  Idempotency-Key: comment-{{$guid}}
+body:
+  type: json
+  content: |-
+    {
+      "body": "Architecture review looks clean! Verified with load test harness."
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.id) {
+          pm.environment.set("commentId", json.data.id);
+      }
+    language: text/javascript
+order: 1000

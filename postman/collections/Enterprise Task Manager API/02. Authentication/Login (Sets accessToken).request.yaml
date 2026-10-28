@@ -1,0 +1,28 @@
+$kind: http-request
+description: Authenticates credentials, returns 15m JWT accessToken, and sets HttpOnly refreshToken cookie.
+url: "{{baseUrl}}/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{email}}",
+      "password": "{{password}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.accessToken) {
+          pm.environment.set("accessToken", json.data.accessToken);
+          pm.environment.set("userId", json.data.user.id);
+          pm.environment.set("userEmail", json.data.user.email);
+          console.log("Logged in successfully as:", json.data.user.email);
+      }
+    language: text/javascript
+order: 3000

@@ -1,0 +1,28 @@
+$kind: http-request
+description: Registers uploaded object into PostgreSQL database and associates it with task.
+url: "{{baseUrl}}/tasks/{{taskId}}/attachments/confirm"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "key": "{{attachmentKey}}",
+      "fileName": "architecture-diagram.pdf",
+      "mimeType": "application/pdf",
+      "sizeBytes": 1048576
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.id) {
+          pm.environment.set("attachmentId", json.data.id);
+          console.log("Confirmed Attachment ID:", json.data.id);
+      }
+    language: text/javascript
+order: 2000

@@ -1,0 +1,34 @@
+$kind: http-request
+description: Creates task, appends monthly ActivityLog row, and writes OutboxEvent in a single transaction.
+url: "{{baseUrl}}/columns/{{columnId}}/tasks"
+method: POST
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Idempotency-Key
+    value: task-create-{{$guid}}
+    description: SHA-256 hashed idempotency key ensuring atomic single execution.
+body:
+  type: json
+  content: |-
+    {
+      "title": "Implement OAuth2 PKCE Authorization Flow",
+      "description": "Deliver secure RFC 7636 PKCE exchange for SPA and mobile clients.",
+      "status": "TODO",
+      "priority": "HIGH",
+      "dueDate": "2026-11-15T18:00:00.000Z"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.id) {
+          pm.environment.set("taskId", json.data.id);
+          pm.environment.set("taskVersion", json.data.version || 1);
+          console.log("Created Task ID:", json.data.id, "Version:", json.data.version);
+      }
+    language: text/javascript
+order: 1000

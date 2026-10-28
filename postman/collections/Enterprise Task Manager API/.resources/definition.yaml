@@ -1,0 +1,13 @@
+$kind: collection
+description: |-
+  Comprehensive, production-grade Postman Collection covering all endpoints: System & Health, Auth, Workspaces, Members, Tags, Boards, Columns, Tasks, Subtasks, Comments, Activity Logs, and S3 Attachments.
+
+  All endpoints include automated environment variable chaining (tokens, workspace IDs, board IDs, task IDs) and response assertions.
+variables:
+  baseUrl: http://localhost:3000
+auth:
+  - id: 3b02c5f7-de45-48a4-b49b-f7b5260aa543
+    type: bearer
+    name: bearer auth
+    credentials:
+      token: "{{accessToken}}"

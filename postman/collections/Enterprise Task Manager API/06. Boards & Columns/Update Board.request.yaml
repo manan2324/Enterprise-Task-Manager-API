@@ -1,0 +1,20 @@
+$kind: http-request
+description: Updates board title and invalidates Redis cache entry.
+url: "{{baseUrl}}/boards/{{boardId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Sprint 24 - Production Deployment"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+    language: text/javascript
+order: 4000

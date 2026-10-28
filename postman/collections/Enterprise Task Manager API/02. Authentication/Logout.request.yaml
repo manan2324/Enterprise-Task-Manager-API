@@ -1,0 +1,13 @@
+$kind: http-request
+description: Revokes the active refresh token family and clears the HttpOnly cookie.
+url: "{{baseUrl}}/auth/logout"
+method: POST
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.environment.set("accessToken", "");
+    language: text/javascript
+order: 7000

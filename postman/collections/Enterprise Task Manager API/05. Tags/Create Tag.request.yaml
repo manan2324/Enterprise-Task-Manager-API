@@ -1,0 +1,26 @@
+$kind: http-request
+description: Creates a tag within the workspace. Hex color codes supported.
+url: "{{baseUrl}}/workspaces/{{workspaceId}}/tags"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Backend-Core",
+      "color": "#3B82F6"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.id) {
+          pm.environment.set("tagId", json.data.id);
+          console.log("Created Tag ID:", json.data.id);
+      }
+    language: text/javascript
+order: 1000

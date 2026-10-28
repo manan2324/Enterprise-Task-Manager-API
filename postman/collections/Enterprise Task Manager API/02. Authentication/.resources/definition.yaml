@@ -1,0 +1,3 @@
+$kind: collection
+description: User registration, argon2id password hashing, email verification, rotating refresh tokens with reuse detection, and password reset.
+order: 2000

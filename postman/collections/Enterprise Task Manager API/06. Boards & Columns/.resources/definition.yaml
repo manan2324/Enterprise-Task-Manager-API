@@ -1,0 +1,3 @@
+$kind: collection
+description: Kanban boards, starter columns (Backlog, In Progress, Done), Redis cache-aside reads, and column positioning.
+order: 6000

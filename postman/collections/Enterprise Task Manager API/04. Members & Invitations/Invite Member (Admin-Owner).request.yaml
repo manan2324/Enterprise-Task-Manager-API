@@ -1,0 +1,26 @@
+$kind: http-request
+name: Invite Member (Admin/Owner)
+description: Dispatches workspace invite token. Requires ADMIN or OWNER.
+url: "{{baseUrl}}/workspaces/{{workspaceId}}/invitations"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "colleague_{{$timestamp}}@example.com",
+      "role": "MEMBER"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.token) {
+          pm.environment.set("invitationToken", json.data.token);
+      }
+    language: text/javascript
+order: 2000

@@ -1,0 +1,26 @@
+$kind: http-request
+description: High-performance keyset cursor pagination with parallel index streams across 1M+ tasks.
+url: "{{baseUrl}}/boards/{{boardId}}/tasks?status=TODO&priority=HIGH&limit=20"
+method: GET
+queryParams:
+  - key: status
+    value: TODO
+    description: Filter by status
+  - key: priority
+    value: HIGH
+    description: Filter by priority
+  - key: limit
+    value: "20"
+    description: Page size
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      var json = pm.response.json();
+      if (json.nextCursor) {
+          pm.environment.set("tasksNextCursor", json.nextCursor);
+      }
+    language: text/javascript
+order: 3000

@@ -1,0 +1,3 @@
+$kind: collection
+description: "Task lifecycle: transactional creation, idempotency keys, optimistic concurrency versioning, fractional reordering, and keyset cursor search across 1M+ rows."
+order: 7000

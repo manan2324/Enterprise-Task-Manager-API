@@ -1,0 +1,48 @@
+name: Enterprise Task Manager - Local / Dev
+values:
+  - key: baseUrl
+    value: 'http://localhost:3000'
+  - key: email
+    value: owner@example.com
+  - key: password
+    value: Password123!
+  - key: accessToken
+    value: ''
+  - key: userId
+    value: ''
+  - key: userEmail
+    value: ''
+  - key: workspaceId
+    value: ''
+  - key: workspaceSlug
+    value: ''
+  - key: memberUserId
+    value: ''
+  - key: invitationToken
+    value: ''
+  - key: emailVerificationToken
+    value: ''
+  - key: passwordResetToken
+    value: ''
+  - key: tagId
+    value: ''
+  - key: boardId
+    value: ''
+  - key: columnId
+    value: ''
+  - key: createdColumnId
+    value: ''
+  - key: taskId
+    value: ''
+  - key: taskVersion
+    value: '1'
+  - key: tasksNextCursor
+    value: ''
+  - key: subtaskId
+    value: ''
+  - key: commentId
+    value: ''
+  - key: attachmentKey
+    value: ''
+  - key: attachmentId
+    value: ''

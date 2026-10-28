@@ -1,0 +1,25 @@
+$kind: http-request
+description: Appends a new column with fractional positioning.
+url: "{{baseUrl}}/boards/{{boardId}}/columns"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "QA & Staging",
+      "position": 2500
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.id) {
+          pm.environment.set("createdColumnId", json.data.id);
+      }
+    language: text/javascript
+order: 5000

@@ -1,0 +1,12 @@
+$kind: http-request
+description: Returns real-time event feed of all activity across the board.
+url: "{{baseUrl}}/boards/{{boardId}}/activity"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+    language: text/javascript
+order: 2000

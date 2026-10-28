@@ -1,0 +1,28 @@
+$kind: http-request
+description: Validates file extension and size, then returns pre-signed S3 PUT URL and storage key.
+url: "{{baseUrl}}/tasks/{{taskId}}/attachments/presign"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "fileName": "architecture-diagram.pdf",
+      "mimeType": "application/pdf",
+      "sizeBytes": 1048576
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.key) {
+          pm.environment.set("attachmentKey", json.data.key);
+          pm.environment.set("uploadUrl", json.data.url);
+          console.log("Pre-signed upload key:", json.data.key);
+      }
+    language: text/javascript
+order: 1000

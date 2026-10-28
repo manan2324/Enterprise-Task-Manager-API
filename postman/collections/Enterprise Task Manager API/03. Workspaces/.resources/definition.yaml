@@ -1,0 +1,3 @@
+$kind: collection
+description: Multi-tenant workspace isolation, creation, membership retrieval, and ownership controls.
+order: 3000

@@ -1,0 +1,16 @@
+$kind: http-request
+description: Retrieves all tags defined in the workspace.
+url: "{{baseUrl}}/workspaces/{{workspaceId}}/tags"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.length > 0 && !pm.environment.get("tagId")) {
+          pm.environment.set("tagId", json.data[0].id);
+      }
+    language: text/javascript
+order: 2000

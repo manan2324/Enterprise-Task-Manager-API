@@ -1,0 +1,3 @@
+$kind: collection
+description: Team discussion threads with markdown body support and author relation hydration.
+order: 9000

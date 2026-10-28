@@ -1,40 +1,47 @@
 import { PrismaClient } from '../src/generated/prisma/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { hashPassword } from '../src/utils/password.js';
+import crypto from 'node:crypto';
 import 'dotenv/config';
 
 const adapter = new PrismaPg({ connectionString: process.env['DATABASE_URL'] });
 const prisma = new PrismaClient({ adapter });
 
-// Standard dummy hash for "Password123!" for demo purposes
-const DEMO_PASSWORD_HASH =
-  '$argon2id$v=19$m=65536,t=3,p=4$dGVzdHNhbHQxMjM0NTY3OA$t45W2Zl1h0ZJkWqL8e0i6s+rV9bH3M6u7p0gQ1dE2aA';
-
 async function main() {
   console.log('🌱 Starting database seed...');
 
-  // 1. Clean existing records for idempotent seeding
-  await prisma.activityLog.deleteMany();
-  await prisma.comment.deleteMany();
-  await prisma.subtask.deleteMany();
-  await prisma.taskAssignee.deleteMany();
-  await prisma.taskTag.deleteMany();
-  await prisma.task.deleteMany();
-  await prisma.column.deleteMany();
-  await prisma.board.deleteMany();
-  await prisma.tag.deleteMany();
-  await prisma.invitation.deleteMany();
-  await prisma.workspaceMember.deleteMany();
-  await prisma.workspace.deleteMany();
-  await prisma.refreshToken.deleteMany();
-  await prisma.notification.deleteMany();
-  await prisma.user.deleteMany();
+  const passwordHash = await hashPassword('Password123!');
+
+  // 1. Fast truncate for idempotent seeding
+  await prisma.$executeRawUnsafe(`
+    TRUNCATE TABLE 
+      "ActivityLog", 
+      "Comment", 
+      "Subtask", 
+      "TaskAssignee", 
+      "TaskTag", 
+      "Task", 
+      "Column", 
+      "Board", 
+      "Tag", 
+      "Invitation", 
+      "WorkspaceMember", 
+      "Workspace", 
+      "RefreshToken", 
+      "Notification", 
+      "IdempotencyKey",
+      "OutboxEvent",
+      "Attachment",
+      "User" 
+    CASCADE;
+  `);
 
   // 2. Create Users
   const owner = await prisma.user.create({
     data: {
       email: 'owner@example.com',
       name: 'Alex Owner',
-      passwordHash: DEMO_PASSWORD_HASH,
+      passwordHash,
       emailVerified: true,
       timezone: 'UTC',
     },
@@ -44,7 +51,7 @@ async function main() {
     data: {
       email: 'admin@example.com',
       name: 'Sam Admin',
-      passwordHash: DEMO_PASSWORD_HASH,
+      passwordHash,
       emailVerified: true,
       timezone: 'America/New_York',
     },
@@ -54,7 +61,7 @@ async function main() {
     data: {
       email: 'member@example.com',
       name: 'Jordan Member',
-      passwordHash: DEMO_PASSWORD_HASH,
+      passwordHash,
       emailVerified: true,
       timezone: 'Europe/London',
     },
@@ -64,7 +71,7 @@ async function main() {
     data: {
       email: 'viewer@example.com',
       name: 'Taylor Viewer',
-      passwordHash: DEMO_PASSWORD_HASH,
+      passwordHash,
       emailVerified: true,
       timezone: 'Asia/Tokyo',
     },
@@ -235,6 +242,7 @@ async function main() {
   await prisma.activityLog.createMany({
     data: [
       {
+        id: crypto.randomUUID(),
         workspaceId: workspace.id,
         actorId: owner.id,
         entityType: 'workspace',
@@ -243,6 +251,7 @@ async function main() {
         metadata: { name: workspace.name },
       },
       {
+        id: crypto.randomUUID(),
         workspaceId: workspace.id,
         actorId: owner.id,
         entityType: 'board',
@@ -251,6 +260,7 @@ async function main() {
         metadata: { name: board.name },
       },
       {
+        id: crypto.randomUUID(),
         workspaceId: workspace.id,
         actorId: owner.id,
         entityType: 'task',

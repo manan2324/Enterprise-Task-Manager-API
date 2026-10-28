@@ -1,0 +1,12 @@
+$kind: http-request
+description: Returns audit history of mutations (created, updated, moved, assigned, deleted) for a task.
+url: "{{baseUrl}}/tasks/{{taskId}}/activity"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+    language: text/javascript
+order: 1000

@@ -1,0 +1,12 @@
+$kind: http-request
+description: Removes member from workspace. Users can also call this to leave a workspace.
+url: "{{baseUrl}}/workspaces/{{workspaceId}}/members/{{memberUserId}}"
+method: DELETE
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+    language: text/javascript
+order: 5000

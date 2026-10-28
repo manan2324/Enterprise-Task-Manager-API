@@ -1,0 +1,29 @@
+$kind: http-request
+description: Creates board with starter columns (Backlog, In Progress, Done) in an atomic transaction.
+url: "{{baseUrl}}/workspaces/{{workspaceId}}/boards"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Sprint 24 - Core Platform"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.id) {
+          pm.environment.set("boardId", json.data.id);
+          if (json.data.columns && json.data.columns.length > 0) {
+              pm.environment.set("columnId", json.data.columns[0].id);
+              console.log("Starter Column ID:", json.data.columns[0].id);
+          }
+          console.log("Created Board ID:", json.data.id);
+      }
+    language: text/javascript
+order: 1000

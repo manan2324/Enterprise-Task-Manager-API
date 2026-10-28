@@ -18,9 +18,9 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/config/env.ts', 'tests/load/benchmark-runner.ts'],
+    files: ['src/config/env.ts', 'tests/load/benchmark-runner.ts', 'scripts/**/*.ts'],
     rules: {
-      'no-console': 'off', // Logger isn't available yet during env validation; CLI benchmark runner
+      'no-console': 'off', // Logger isn't available yet during env validation; CLI scripts
     },
   },
   {

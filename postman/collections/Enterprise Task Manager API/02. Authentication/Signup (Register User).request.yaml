@@ -1,0 +1,27 @@
+$kind: http-request
+description: Creates user account, hashes password with argon2id, and queues verification email.
+url: "{{baseUrl}}/auth/signup"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "newuser_{{$timestamp}}@example.com",
+      "password": "Password123!",
+      "name": "Enterprise Professional",
+      "timezone": "America/New_York"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.id) {
+          pm.environment.set("registeredUserId", json.data.id);
+      }
+    language: text/javascript
+order: 1000

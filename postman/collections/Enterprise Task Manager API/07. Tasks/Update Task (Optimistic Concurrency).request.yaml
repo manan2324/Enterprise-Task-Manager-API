@@ -1,0 +1,27 @@
+$kind: http-request
+description: Atomic update guarded by version check. Returns 409 VERSION_CONFLICT if stale.
+url: "{{baseUrl}}/tasks/{{taskId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Implement OAuth2 PKCE Flow (Reviewed)",
+      "status": "IN_PROGRESS",
+      "priority": "URGENT",
+      "version": 1
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.version) {
+          pm.environment.set("taskVersion", json.data.version);
+      }
+    language: text/javascript
+order: 4000

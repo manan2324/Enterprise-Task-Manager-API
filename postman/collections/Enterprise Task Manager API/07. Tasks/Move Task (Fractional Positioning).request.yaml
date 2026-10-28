@@ -1,0 +1,21 @@
+$kind: http-request
+description: Moves task across columns or reorders within column using midpoint fractional arithmetic.
+url: "{{baseUrl}}/tasks/{{taskId}}/move"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "columnId": "{{columnId}}",
+      "targetPosition": 1500
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+    language: text/javascript
+order: 5000

@@ -1,0 +1,3 @@
+$kind: collection
+description: Enterprise monthly-partitioned audit trails capturing all state mutations with JSON metadata diffs.
+order: 10000

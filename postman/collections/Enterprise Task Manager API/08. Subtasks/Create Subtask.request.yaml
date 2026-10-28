@@ -1,0 +1,25 @@
+$kind: http-request
+description: Adds subtask to parent task.
+url: "{{baseUrl}}/tasks/{{taskId}}/subtasks"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Write RFC unit tests for SHA-256 code challenge"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      var json = pm.response.json();
+      if (json.data && json.data.id) {
+          pm.environment.set("subtaskId", json.data.id);
+          console.log("Created Subtask ID:", json.data.id);
+      }
+    language: text/javascript
+order: 1000
