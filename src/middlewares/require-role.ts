@@ -65,6 +65,45 @@ export async function resolveWorkspaceId(req: Request): Promise<string | null> {
     return board?.workspaceId ?? null;
   }
 
+  // Route matches /tasks/:id or has taskId
+  const taskId =
+    getStringParam(req.params['taskId']) ||
+    (req.baseUrl.includes('tasks') ? getStringParam(req.params['id']) : null);
+
+  if (taskId) {
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { workspaceId: true },
+    });
+    return task?.workspaceId ?? null;
+  }
+
+  // Route matches /subtasks/:id or has subtaskId
+  const subtaskId =
+    getStringParam(req.params['subtaskId']) ||
+    (req.baseUrl.includes('subtasks') ? getStringParam(req.params['id']) : null);
+
+  if (subtaskId) {
+    const subtask = await prisma.subtask.findUnique({
+      where: { id: subtaskId },
+      select: { task: { select: { workspaceId: true } } },
+    });
+    return subtask?.task?.workspaceId ?? null;
+  }
+
+  // Route matches /attachments/:id or has attachmentId
+  const attachmentId =
+    getStringParam(req.params['attachmentId']) ||
+    (req.baseUrl.includes('attachments') ? getStringParam(req.params['id']) : null);
+
+  if (attachmentId) {
+    const attachment = await prisma.attachment.findUnique({
+      where: { id: attachmentId },
+      select: { task: { select: { workspaceId: true } } },
+    });
+    return attachment?.task?.workspaceId ?? null;
+  }
+
   if (typeof req.body === 'object' && req.body !== null && 'workspaceId' in req.body) {
     const bodyWsId = getStringParam((req.body as { workspaceId: unknown }).workspaceId);
     if (bodyWsId) return bodyWsId;

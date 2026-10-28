@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { workspacesController } from './workspaces.controller.js';
 import { workspaceBoardsRouter } from '../boards/boards.routes.js';
+import { workspaceTagsRouter } from '../tags/tags.routes.js';
 import { authenticate } from '../../middlewares/authenticate.js';
 import { requireRole } from '../../middlewares/require-role.js';
 import { validate } from '../../middlewares/validate.js';
@@ -54,6 +55,9 @@ router.delete(
 
 // ── Workspace-scoped Boards ──
 router.use('/:id/boards', workspaceBoardsRouter);
+
+// ── Workspace-scoped Tags ──
+router.use('/:id/tags', workspaceTagsRouter);
 
 // ── Members & Invitations ──
 router.get(

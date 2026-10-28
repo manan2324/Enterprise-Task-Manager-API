@@ -292,7 +292,8 @@ describe('Boards & Columns Module Integration', () => {
     });
 
     it('allows ADMIN and OWNER to update column name and reorder with fractional position', async () => {
-      const firstColumn = board.columns[0]!;
+      const firstColumn = board.columns[0];
+      if (!firstColumn) throw new Error('Expected first column to exist');
 
       // Rename and move column to position 2500 (between In Progress 2000 and Done 3000)
       const res = await request(app)
@@ -309,7 +310,8 @@ describe('Boards & Columns Module Integration', () => {
     });
 
     it('returns 404 for non-member attempting to patch a column (cross-workspace IDOR check)', async () => {
-      const firstColumn = board.columns[0]!;
+      const firstColumn = board.columns[0];
+      if (!firstColumn) throw new Error('Expected first column to exist');
 
       const res = await request(app)
         .patch(`/columns/${firstColumn.id}`)
@@ -321,7 +323,8 @@ describe('Boards & Columns Module Integration', () => {
     });
 
     it('allows ADMIN and OWNER to delete a column', async () => {
-      const lastColumn = board.columns[2]!;
+      const lastColumn = board.columns[2];
+      if (!lastColumn) throw new Error('Expected last column to exist');
 
       const res = await request(app)
         .delete(`/columns/${lastColumn.id}`)
@@ -335,7 +338,8 @@ describe('Boards & Columns Module Integration', () => {
     });
 
     it('forbids MEMBER and VIEWER from deleting a column (403)', async () => {
-      const firstColumn = board.columns[0]!;
+      const firstColumn = board.columns[0];
+      if (!firstColumn) throw new Error('Expected first column to exist');
 
       for (const user of [memberUser, viewerUser]) {
         const res = await request(app)
@@ -347,7 +351,8 @@ describe('Boards & Columns Module Integration', () => {
     });
 
     it('returns 404 for non-member attempting to delete a column', async () => {
-      const firstColumn = board.columns[0]!;
+      const firstColumn = board.columns[0];
+      if (!firstColumn) throw new Error('Expected first column to exist');
 
       const res = await request(app)
         .delete(`/columns/${firstColumn.id}`)

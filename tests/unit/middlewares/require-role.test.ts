@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 import { requireRole, ROLE_RANK } from '../../../src/middlewares/require-role.js';
-import { AppError } from '../../../src/utils/app-error.js';
 import { prisma } from '../../../src/config/prisma.js';
 
 vi.mock('../../../src/config/prisma.js', () => ({
@@ -13,6 +12,12 @@ vi.mock('../../../src/config/prisma.js', () => ({
       findUnique: vi.fn(),
     },
     column: {
+      findUnique: vi.fn(),
+    },
+    task: {
+      findUnique: vi.fn(),
+    },
+    subtask: {
       findUnique: vi.fn(),
     },
   },
@@ -152,6 +157,34 @@ describe('requireRole middleware', () => {
 
     expect(req.workspaceId).toBe('ws-from-board');
     expect(req.membership?.role).toBe('OWNER');
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('resolves workspace from taskId and allows member with sufficient role', async () => {
+    const middleware = requireRole('MEMBER');
+    const req = {
+      user: { id: 'user-1', email: 'test@example.com' },
+      baseUrl: '/tasks',
+      params: { id: 'task-101' },
+    } as unknown as Request;
+
+    vi.mocked(prisma.task.findUnique).mockResolvedValue({
+      id: 'task-101',
+      workspaceId: 'ws-from-task',
+    } as never);
+
+    const mockMembership = {
+      workspaceId: 'ws-from-task',
+      userId: 'user-1',
+      role: 'MEMBER' as const,
+      joinedAt: new Date(),
+    };
+    vi.mocked(prisma.workspaceMember.findUnique).mockResolvedValue(mockMembership);
+
+    await middleware(req, res, next);
+
+    expect(req.workspaceId).toBe('ws-from-task');
+    expect(req.membership?.role).toBe('MEMBER');
     expect(next).toHaveBeenCalled();
   });
 });

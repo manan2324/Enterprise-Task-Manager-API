@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { boardsController } from './boards.controller.js';
+import { columnTasksRouter, boardActivityRouter, boardTasksRouter } from '../tasks/tasks.routes.js';
 import { authenticate } from '../../middlewares/authenticate.js';
 import { requireRole } from '../../middlewares/require-role.js';
 import { validate } from '../../middlewares/validate.js';
@@ -54,6 +55,12 @@ boardsRouter.delete(
   asyncHandler(boardsController.deleteBoard),
 );
 
+// ── Board Activity: /boards/:id/activity ──
+boardsRouter.use('/:id/activity', boardActivityRouter);
+
+// ── Board Tasks search & pagination: /boards/:id/tasks ──
+boardsRouter.use('/:id/tasks', boardTasksRouter);
+
 // ── Columns under board: /boards/:id/columns ──
 boardsRouter.post(
   '/:id/columns',
@@ -78,6 +85,9 @@ columnsRouter.delete(
   requireRole('ADMIN'),
   asyncHandler(boardsController.deleteColumn),
 );
+
+// ── Column Tasks: /columns/:id/tasks ──
+columnsRouter.use('/:id/tasks', columnTasksRouter);
 
 export {
   boardsRouter,

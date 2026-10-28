@@ -28,7 +28,11 @@ export const validate = (schemas: ValidationSchemas) => {
     if (schemas.params) {
       const result = schemas.params.safeParse(req.params);
       if (result.success) {
-        req.params = result.data as Record<string, string>;
+        Object.defineProperty(req, 'params', {
+          value: result.data,
+          writable: true,
+          configurable: true,
+        });
       } else {
         errors.push(result.error);
       }
@@ -37,7 +41,11 @@ export const validate = (schemas: ValidationSchemas) => {
     if (schemas.query) {
       const result = schemas.query.safeParse(req.query);
       if (result.success) {
-        req.query = result.data as Record<string, string>;
+        Object.defineProperty(req, 'query', {
+          value: result.data,
+          writable: true,
+          configurable: true,
+        });
       } else {
         errors.push(result.error);
       }

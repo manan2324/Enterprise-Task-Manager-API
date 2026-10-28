@@ -1,10 +1,15 @@
+import { createServer } from 'node:http';
 import { app } from './app.js';
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
 import { prisma } from './config/prisma.js';
-import { redis } from './config/redis.js';
+import { cacheRedis, queueRedis, workerRedis } from './config/redis.js';
+import { initSocketIO } from './realtime/socket.js';
 
-const server = app.listen(env.PORT, () => {
+const httpServer = createServer(app);
+initSocketIO(httpServer);
+
+const server = httpServer.listen(env.PORT, () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, '🚀 Server started');
 });
 
@@ -19,7 +24,9 @@ const shutdown = async (signal: string) => {
   server.close(async () => {
     await Promise.allSettled([
       prisma.$disconnect(),
-      redis.quit(),
+      cacheRedis.quit(),
+      queueRedis.quit(),
+      workerRedis.quit(),
     ]);
     logger.info('Cleanup complete, exiting');
     process.exit(0);

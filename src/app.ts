@@ -12,6 +12,7 @@ import { redis } from './config/redis.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { workspaceRoutes, invitationsRouter } from './modules/workspaces/workspaces.routes.js';
 import { boardsRouter, columnsRouter } from './modules/boards/boards.routes.js';
+import { tasksRouter, attachmentsRouter } from './modules/tasks/tasks.routes.js';
 
 const app = express();
 
@@ -112,6 +113,14 @@ app.use('/api/v1/boards', boardsRouter);
 //columns
 app.use('/columns', columnsRouter);
 app.use('/api/v1/columns', columnsRouter);
+
+//tasks
+app.use('/tasks', tasksRouter);
+app.use('/api/v1/tasks', tasksRouter);
+
+//attachments
+app.use('/attachments', attachmentsRouter);
+app.use('/api/v1/attachments', attachmentsRouter);
 
 // ── 404 handler ──
 app.use((_req, res) => {

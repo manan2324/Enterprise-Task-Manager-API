@@ -1,4 +1,6 @@
 import { boardsRepository, type BoardsRepository } from './boards.repository.js';
+import { cacheService } from '../../services/cache.service.js';
+import { emitToBoard } from '../../realtime/events.js';
 import type {
   CreateBoardInput,
   UpdateBoardInput,
@@ -26,10 +28,17 @@ export class BoardsService {
   }
 
   async getBoardById(boardId: string) {
+    const cached = await cacheService.getCachedBoard(boardId);
+    if (cached) {
+      return cached;
+    }
+
     const board = await this.repo.findBoardWithColumns(boardId);
     if (!board) {
       throw new AppError(404, 'NOT_FOUND', 'Board not found');
     }
+
+    await cacheService.setCachedBoard(boardId, board, 60);
     return board;
   }
 
@@ -38,7 +47,10 @@ export class BoardsService {
     if (!board) {
       throw new AppError(404, 'NOT_FOUND', 'Board not found');
     }
-    return this.repo.updateBoard(boardId, input.name);
+    const updated = await this.repo.updateBoard(boardId, input.name);
+    await cacheService.invalidateBoard(boardId);
+    emitToBoard(boardId, 'board.updated', updated);
+    return updated;
   }
 
   async deleteBoard(boardId: string) {
@@ -47,6 +59,7 @@ export class BoardsService {
       throw new AppError(404, 'NOT_FOUND', 'Board not found');
     }
     await this.repo.deleteBoard(boardId);
+    await cacheService.invalidateBoard(boardId);
     return { message: 'Board deleted successfully' };
   }
 
@@ -62,7 +75,10 @@ export class BoardsService {
       position = highest > 0 ? highest + 1000 : 1000;
     }
 
-    return this.repo.createColumn(boardId, input.name, position);
+    const column = await this.repo.createColumn(boardId, input.name, position);
+    await cacheService.invalidateBoard(boardId);
+    emitToBoard(boardId, 'board.updated', { columnId: column.id });
+    return column;
   }
 
   async updateColumn(columnId: string, input: UpdateColumnInput) {
@@ -70,7 +86,10 @@ export class BoardsService {
     if (!column) {
       throw new AppError(404, 'NOT_FOUND', 'Column not found');
     }
-    return this.repo.updateColumn(columnId, input);
+    const updated = await this.repo.updateColumn(columnId, input);
+    await cacheService.invalidateBoard(column.boardId);
+    emitToBoard(column.boardId, 'board.updated', { columnId });
+    return updated;
   }
 
   async deleteColumn(columnId: string) {
@@ -79,6 +98,8 @@ export class BoardsService {
       throw new AppError(404, 'NOT_FOUND', 'Column not found');
     }
     await this.repo.deleteColumn(columnId);
+    await cacheService.invalidateBoard(column.boardId);
+    emitToBoard(column.boardId, 'board.updated', { columnId });
     return { message: 'Column deleted successfully' };
   }
 }

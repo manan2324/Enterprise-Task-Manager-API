@@ -340,12 +340,13 @@ describe('Workspaces Module Integration', () => {
         where: { workspaceId: workspace.id, email: invitedUser.email },
       });
       expect(invitation).not.toBeNull();
+      if (!invitation) throw new Error('Expected invitation to exist');
 
       // For test purposes, set a known token hash
       const { hashToken } = await import('../../src/utils/token.js');
       const testToken = `invite-token-${Date.now()}-${Math.random().toString(36).substring(2)}`;
       await prisma.invitation.update({
-        where: { id: invitation!.id },
+        where: { id: invitation.id },
         data: { tokenHash: hashToken(testToken) },
       });
 
@@ -386,10 +387,13 @@ describe('Workspaces Module Integration', () => {
         where: { workspaceId: workspace.id, email: invitedUser.email },
       });
 
+      expect(invitation).not.toBeNull();
+      if (!invitation) throw new Error('Expected invitation to exist');
+
       const { hashToken } = await import('../../src/utils/token.js');
       const testToken = `mismatch-token-${Date.now()}-${Math.random().toString(36).substring(2)}`;
       await prisma.invitation.update({
-        where: { id: invitation!.id },
+        where: { id: invitation.id },
         data: { tokenHash: hashToken(testToken) },
       });
 
